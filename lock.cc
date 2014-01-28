@@ -1,23 +1,27 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <unistd.h>
 
 #include "util.h"
 
-void lockFile(const std::string& path);
-void unlockFile(const std::string& key_path, const std::string& path);
+int lockFile(const std::string& path);
+int unlockFile(const std::string& key_path, const std::string& path);
 
 int main(int argc, char* argv[]) {
   switch (argc) {
-    case 2: lockFile(argv[1]); break;
-    case 3: unlockFile(argv[1], argv[2]); break;
-    default: printf("Incorrect number of arguments\n"); return argc;
+    case 2: return lockFile(argv[1]);
+    case 3: return unlockFile(argv[1], argv[2]);
+    default:
+      printf("usage: %s target_file\n", argv[0]);
+      printf("       %s file.key file.lock\n", argv[0]);
+      return 64;
   }
 
   return 0;
 }
 
-void lockFile(const std::string& path) {
+int lockFile(const std::string& path) {
   const auto extpos = std::min(path.find_last_of("."), path.size());
   auto slashpos = path.find_last_of("/");
   if (slashpos == std::string::npos) slashpos = 0;
@@ -43,6 +47,11 @@ void lockFile(const std::string& path) {
   printf("\n");
 
   char_map m = setToMap(s);
+  const std::string password(getpass("Password: "));
+  if (password.size() != 0 && password.compare(getpass("Confirm: ")) != 0) {
+    printf("Passwords do not match\n");
+    return 8;
+  }
   std::ofstream key_file("./" + filename + ".key",
                          std::ofstream::out | std::ios::binary);
   progress = 0;
@@ -65,15 +74,16 @@ void lockFile(const std::string& path) {
   }
   lock_file.close();
   printf("\n");
+  return 0;
 }
 
-void unlockFile(const std::string& key_path, const std::string& path) {
+int unlockFile(const std::string& key_path, const std::string& path) {
   size_t progress = 0;
   char_map m;
-  printf("Loading key...\n");
+  printf("Loading key\n");
   {
     std::ifstream key_file(key_path, std::ios::in | std::ios::binary);
-    char_vec kv = fileToVec(key_file);
+    const char_vec kv = fileToVec(key_file);
     for (auto it = kv.begin(), end = kv.end(); it != end; ++it) {
       const char a = *it;
       const char b = *(++it);
@@ -82,17 +92,18 @@ void unlockFile(const std::string& key_path, const std::string& path) {
     key_file.close();
   }
  
+  const std::string password(getpass("Password: "));
   std::string out_name = path.substr(0, path.find_last_of(".")); 
   std::ofstream out_file(out_name + ".out",
                          std::ofstream::out | std::ios::binary);
   
-  printf("Unlocking file...");
   std::ifstream lock_file(path, std::ios::in | std::ios::binary);
   char_vec v = fileToVec(lock_file);
   for (const char& c : v) {
     out_file << m[c];
-    loadBar(progress++, v.size());
+    loadBar(progress++, v.size(), "Unlocking file...");
   }
   printf("\n");
   out_file.close();
+  return 0;
 }
