@@ -43,11 +43,12 @@ inline char_map setToMap(const char_set& s) {
 
 inline void loadBar(size_t x, size_t n, const char* text = "") {
   const size_t w = 40lu;
-  if ((x != n) and (x % ((n/100) + 1) != 0)) return;
+  if (x > n) return;
+  if (x % ((n/100) + 1) != 0) return;
   float rat = x / (float) n;
   int c = rat * w;
-  std::cout << text << " [";
+  std::cout << text << std::setw(3) << (int) (rat * 100) << "% [";
   for (int i = 0; i < c; ++i) std::cout << "#";
-  for (int i = c; i < w; ++i) std::cout << " ";
+  for (int i = c; i < w-1; ++i) std::cout << " ";
   std::cout << "]\r" << std::flush;
 }

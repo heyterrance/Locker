@@ -21,6 +21,7 @@ void lockFile(const std::string& path) {
   const auto extpos = std::min(path.find_last_of("."), path.size());
   auto slashpos = path.find_last_of("/");
   if (slashpos == std::string::npos) slashpos = 0;
+  else ++slashpos;
   const std::string fileext = path.substr(extpos);
   const std::string filename = path.substr(slashpos, extpos - slashpos);
   printf("filename: %s, ext: %s\n", filename.c_str(), fileext.c_str());
