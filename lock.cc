@@ -51,9 +51,11 @@ void Lock::createKey() {
   std::ofstream key_file("./" + file_name + ".key",
                          std::ofstream::out | std::ios::binary);
   char fname[256];
+  const std::string full_name = file_name + file_ext;
   // Put filename in key.
-  strncpy(fname, file_name.c_str(), 256);
-  strncpy(fname + file_name.size(), file_ext.c_str(), 256 - file_name.size());
+  printf("Key for: %s\n", full_name.c_str());
+  strcpy(fname, full_name.c_str());
+  std::cout << "Key for: " << full_name << std::endl;
   for (size_t i = 0; i < 256; ++i)
     key_file.put(fname[i]);
 
@@ -82,29 +84,26 @@ void Lock::createLock() {
 }
   
 int Lock::unlock(const std::string& key_path, const std::string& lock_path) {
-  char fname[256];
   printf("Loading key\n");
+  char fname[256];
   {
     std::ifstream key_file(key_path, std::ios::in | std::ios::binary);
     const char_vec kv = fileToVec(key_file);
-    for (size_t i = 0; i < kv.size(); ++i) {
-      if (i < 256) {
-        fname[i] = kv[i]; 
-        continue;
-      } else {
-        const char a = kv[i];
-        const char b = kv[++i];
-        m[b] = a;
-      }
+    strncpy(fname, kv.data(), 256);
+    printf("fname: %s\n", fname);
+    for (size_t i = 256; i < kv.size(); ++i) {
+      const char a = kv[i];
+      const char b = kv[++i];
+      m[b] = a;
     }
+    file_name = std::string(fname); // includes extension.
     key_file.close();
   }
   
-  file_name = fname; // includes extension.
   const std::string password(getpass("Password: "));
   setFileName(lock_path);
-  std::cout << "Out filename: " << file_name << '\n';
-  std::ofstream out_file(file_name, std::ofstream::out | std::ios::binary);
+  std::cout << "Out filename: " << fname << '\n';
+  std::ofstream out_file(fname, std::ofstream::out | std::ios::binary);
   
   std::ifstream lock_file(lock_path, std::ios::in | std::ios::binary);
   char_vec v = fileToVec(lock_file);
