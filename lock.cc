@@ -1,59 +1,62 @@
-#include <string>
-#include <iostream>
-#include <fstream>
-#include <unistd.h>
+#include "lock.h"
 
-#include "util.h"
+int Lock::lock(const std::string& file_path) {
+  setFileName(file_path);
 
-int lockFile(const std::string& path);
-int unlockFile(const std::string& key_path, const std::string& path);
-
-int main(int argc, char* argv[]) {
-  switch (argc) {
-    case 2: return lockFile(argv[1]);
-    case 3: return unlockFile(argv[1], argv[2]);
-    default:
-      printf("usage: %s target_file\n", argv[0]);
-      printf("       %s file.key file.lock\n", argv[0]);
-      return 64;
-  }
-
-  return 0;
-}
-
-int lockFile(const std::string& path) {
-  const auto extpos = std::min(path.find_last_of("."), path.size());
-  auto slashpos = path.find_last_of("/");
-  if (slashpos == std::string::npos) slashpos = 0;
-  else ++slashpos;
-  const std::string fileext = path.substr(extpos);
-  const std::string filename = path.substr(slashpos, extpos - slashpos);
-  printf("filename: %s, ext: %s\n", filename.c_str(), fileext.c_str());
- 
-  // Put file into vector.
-  std::ifstream file(path, std::ios::in | std::ios::binary);
   printf("Loading file...\n");
-  char_vec v = fileToVec(file); 
-  file.close();
+  v = loadFile(file_path);
+
   printf("File size: %luMB\n", v.size() >> 20);
-
-  // Read file into map.
-  char_set s;
-  size_t progress = 0;
-  for (const auto& c : v) {
-    s.insert(c);
-    loadBar(progress++, v.size(), "Reading file\t");
-  }
-  printf("\n");
-
-  char_map m = setToMap(s);
+  
+  // Get password. (Currently unused)
   const std::string password(getpass("Password: "));
   if (password.size() != 0 && password.compare(getpass("Confirm: ")) != 0) {
     printf("Passwords do not match\n");
     return 8;
   }
-  std::ofstream key_file("./" + filename + ".key",
+
+  createKey();
+  createLock();
+  return 0;
+}
+
+char_vec Lock::loadFile(const std::string& path) {
+  std::ifstream file(path, std::ios::in | std::ios::binary);
+  char_vec v = fileToVec(file); 
+  file.close();
+  return v;
+}
+
+void Lock::setFileName(const std::string& path) {
+  const auto extpos = std::min(path.find_last_of("."), path.size());
+  auto slashpos = path.find_last_of("/");
+  if (slashpos == std::string::npos) slashpos = 0;
+  else ++slashpos;
+
+  file_ext  = path.substr(extpos);
+  file_name = path.substr(slashpos, extpos - slashpos);
+}
+
+void Lock::createKey() {
+  // Read file into map.
+  size_t progress = 0;
+
+  for (const char& c : v) {
+    s.insert(c);
+    loadBar(progress++, v.size(), "Reading file\t");
+  }
+  printf("\n");
+  m = setToMap(s);
+
+  std::ofstream key_file("./" + file_name + ".key",
                          std::ofstream::out | std::ios::binary);
+  char fname[256];
+  // Put filename in key.
+  strncpy(fname, file_name.c_str(), 256);
+  strncpy(fname + file_name.size(), file_ext.c_str(), 256 - file_name.size());
+  for (size_t i = 0; i < 256; ++i)
+    key_file.put(fname[i]);
+
   progress = 0;
   for (const auto& it : m) {
     const char a = it.first;
@@ -64,41 +67,48 @@ int lockFile(const std::string& path) {
   }
   printf("\n");
   key_file.close();
+}
 
-  std::ofstream lock_file("./" + filename + ".lock",
+void Lock::createLock() {
+  std::ofstream lock_file("./" + file_name + ".lock",
                           std::ofstream::out | std::ios::binary);
-  progress = 0;
+  size_t progress = 0;
   for (const auto& c : v) {
     lock_file << m[c];
     loadBar(progress++, v.size(), "Locking file\t");
   }
   lock_file.close();
   printf("\n");
-  return 0;
 }
-
-int unlockFile(const std::string& key_path, const std::string& path) {
-  size_t progress = 0;
-  char_map m;
+  
+int Lock::unlock(const std::string& key_path, const std::string& lock_path) {
+  char fname[256];
   printf("Loading key\n");
   {
     std::ifstream key_file(key_path, std::ios::in | std::ios::binary);
     const char_vec kv = fileToVec(key_file);
-    for (auto it = kv.begin(), end = kv.end(); it != end; ++it) {
-      const char a = *it;
-      const char b = *(++it);
-      m[b] = a;
+    for (size_t i = 0; i < kv.size(); ++i) {
+      if (i < 256) {
+        fname[i] = kv[i]; 
+        continue;
+      } else {
+        const char a = kv[i];
+        const char b = kv[++i];
+        m[b] = a;
+      }
     }
     key_file.close();
   }
- 
-  const std::string password(getpass("Password: "));
-  std::string out_name = path.substr(0, path.find_last_of(".")); 
-  std::ofstream out_file(out_name + ".out",
-                         std::ofstream::out | std::ios::binary);
   
-  std::ifstream lock_file(path, std::ios::in | std::ios::binary);
+  file_name = fname; // includes extension.
+  const std::string password(getpass("Password: "));
+  setFileName(lock_path);
+  std::cout << "Out filename: " << file_name << '\n';
+  std::ofstream out_file(file_name, std::ofstream::out | std::ios::binary);
+  
+  std::ifstream lock_file(lock_path, std::ios::in | std::ios::binary);
   char_vec v = fileToVec(lock_file);
+  size_t progress = 0;
   for (const char& c : v) {
     out_file << m[c];
     loadBar(progress++, v.size(), "Unlocking file...");
