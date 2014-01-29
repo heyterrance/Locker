@@ -53,9 +53,7 @@ void Lock::createKey() {
   char fname[256];
   const std::string full_name = file_name + file_ext;
   // Put filename in key.
-  printf("Key for: %s\n", full_name.c_str());
   strcpy(fname, full_name.c_str());
-  std::cout << "Key for: " << full_name << std::endl;
   for (size_t i = 0; i < 256; ++i)
     key_file.put(fname[i]);
 
@@ -96,7 +94,6 @@ int Lock::unlock(const std::string& key_path, const std::string& lock_path) {
       const char b = kv[++i];
       m[b] = a;
     }
-    file_name = std::string(fname); // includes extension.
     key_file.close();
   }
   
