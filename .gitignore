@@ -1,4 +1,5 @@
 *.swp
 *.lock
 *.key
+*.o
 lock
