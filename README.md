@@ -3,7 +3,7 @@ Locker
 
 Creates a randomly generated key for a file and encrypts the file.
 
-Instaliation and Use
+Installation and Use
 --------------------
 
 ```sh
